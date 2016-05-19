@@ -131,6 +131,8 @@ static const char *CLI_HELP_STR[] =
    "",
    "  ps [username] - print sessions, with optional exact user match",
    "",
+   "  asd - print all sessions data stats as JSON",
+   "",
    "  psp <usernamestr> - print sessions, with partial user string match",
    "",
    "  psd <file-name> - dump ps command output into file on the TURN server system",
@@ -547,6 +549,32 @@ static int print_session(ur_map_key_type key, ur_map_value_type value, void *arg
 	return 0;
 }
 
+static int print_session_data(ur_map_key_type key, ur_map_value_type value, void *arg)
+{
+	if(key && value && arg) {
+		struct ps_arg *csarg = (struct ps_arg*)arg;
+		struct cli_session* cs = csarg->cs;
+		struct turn_session_info *tsi = (struct turn_session_info *)value;
+
+		if(cs->realm[0] && strcmp(cs->realm,tsi->realm))
+			return 0;
+
+		if(cs->origin[0] && strcmp(cs->origin,tsi->origin))
+			return 0;
+
+		if (csarg->counter > 0) {
+			myprintf(cs, ",");
+		} else {
+			myprintf(cs, "{\n");
+		}
+		myprintf(cs,"\n{\n\"usage\": {\"rp\": %lu, \"rb\": %lu, \"sp\": %lu, \"sb\": %lu\n},\n",(unsigned long)(tsi->received_packets), (unsigned long)(tsi->received_bytes),(unsigned long)(tsi->sent_packets),(unsigned long)(tsi->sent_bytes));
+		myprintf(cs,"{\"rate\": {\"r\": %lu, \"s\": %lu, \"total\": %lu}\n}\n",(unsigned long)(tsi->received_rate), (unsigned long)(tsi->sent_rate),(unsigned long)(tsi->total_rate));
+
+		csarg->counter += 1;
+	}
+	return 0;
+}
+
 static void cancel_session(struct cli_session* cs, const char* ssid)
 {
 	if(cs && cs->ts && ssid && *ssid) {
@@ -637,6 +665,18 @@ static void print_sessions(struct cli_session* cs, const char* pn, int exact_mat
 	}
 }
 
+static void print_all_sessions_data(struct cli_session* cs)
+{
+	if(cs && cs->ts) {
+
+		struct ps_arg arg = {cs,0,0,NULL,"",0,NULL,NULL,NULL,0};
+
+		ur_map_foreach_arg(adminserver.sessions, (foreachcb_arg_type)print_session_data, &arg);
+		if (arg.counter > 0) {
+			myprintf(cs,"}\n");
+		}
+	}
+}
 static void cli_print_configuration(struct cli_session* cs)
 {
 	if(cs) {
@@ -1030,6 +1070,9 @@ static int run_cli_input(struct cli_session* cs, const char *buf0, unsigned int 
 				type_cli_cursor(cs);
 			} else if(strstr(cmd,"ps") == cmd) {
 				print_sessions(cs,cmd+2,1,0);
+				type_cli_cursor(cs);
+			} else if(strstr(cmd,"asd") == cmd) {
+				print_all_sessions_data(cs);
 				type_cli_cursor(cs);
 			} else if(strstr(cmd,"cs ") == cmd) {
 				cancel_session(cs,cmd+3);
