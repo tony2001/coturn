@@ -1796,6 +1796,7 @@ int main(int argc, char **argv)
 	init_listener();
 	init_secrets_list(&turn_params.default_users_db.ram_db.static_auth_secrets);
 	init_dynamic_ip_lists();
+	init_stun_stats();
 
 	if (!strstr(argv[0], "turnadmin")) {
 

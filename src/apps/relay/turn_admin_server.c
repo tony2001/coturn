@@ -105,7 +105,7 @@ struct cli_session {
 
 #define CLI_PASSWORD_TRY_NUMBER (5)
 
-static const char *CLI_HELP_STR[] = 
+static const char *CLI_HELP_STR[] =
   {"",
    "  ?, h, help - print this text",
    "",
@@ -145,6 +145,8 @@ static const char *CLI_HELP_STR[] =
    "  dtas ip[:port] - delete a TLS alternate server reference",
    "",
    "  cs <session-id> - cancel session, forcefully"
+   "",
+   "  ss - print STUN commands stats"
    "",
    NULL};
 
@@ -919,6 +921,77 @@ static void cli_del_tls_alternate_server(struct cli_session* cs, const char* pn)
 	}
 }
 
+static void print_stun_stats(struct cli_session* cs)
+{
+	if(cs && cs->ts) {
+		int i, j;
+		stun_stats_t stats = get_stun_stats();
+		myprintf(cs,"{\n");
+
+		for (j = 0; j < 2; j++) {
+			unsigned long *data;
+			if (j == 0) {
+				data = stats.method_cnt;
+				myprintf(cs,"\"stun_command_cnt\": {\n");
+			} else {
+				data = stats.method_error_cnt;
+				myprintf(cs,",\n\"stun_command_error_cnt\": {\n");
+			}
+
+			for (i = 0; i < STUN_METHOD_MAX; i++) {
+				unsigned long cnt;
+				int existing = 1, method = i + 1;
+
+				cnt = data[i];
+
+				switch (method) {
+					case STUN_METHOD_BINDING:
+						myprintf(cs, "    \"binding\": %lu", cnt);
+						break;
+					case STUN_METHOD_ALLOCATE:
+						myprintf(cs, "    \"allocate\": %lu", cnt);
+						break;
+					case STUN_METHOD_REFRESH:
+						myprintf(cs, "     \"refresh\": %lu", cnt);
+						break;
+					case STUN_METHOD_SEND:
+						myprintf(cs, "     \"send\": %lu", cnt);
+						break;
+					case STUN_METHOD_DATA:
+						myprintf(cs, "     \"data\": %lu", cnt);
+						break;
+					case STUN_METHOD_CREATE_PERMISSION:
+						myprintf(cs, "     \"create_permission\": %lu", cnt);
+						break;
+					case STUN_METHOD_CHANNEL_BIND:
+						myprintf(cs, "     \"channel_bind\": %lu", cnt);
+						break;
+					case STUN_METHOD_CONNECT:
+						myprintf(cs, "     \"connect\": %lu", cnt);
+						break;
+					case STUN_METHOD_CONNECTION_BIND:
+						myprintf(cs, "     \"connection_bind\": %lu", cnt);
+						break;
+					case STUN_METHOD_CONNECTION_ATTEMPT:
+						myprintf(cs, "     \"connection_attempt\": %lu", cnt);
+						break;
+					default:
+						existing = 0;
+						break;
+				}
+
+				if (existing && method != STUN_METHOD_MAX) {
+					myprintf(cs, ",\n");
+				}
+
+			}
+			myprintf(cs,"}");
+		}
+
+		myprintf(cs,"\n}\n");
+	}
+}
+
 static int run_cli_input(struct cli_session* cs, const char *buf0, unsigned int len)
 {
 	int ret = 0;
@@ -1054,6 +1127,9 @@ static int run_cli_input(struct cli_session* cs, const char *buf0, unsigned int 
 				type_cli_cursor(cs);
 			} else if(strstr(cmd,"dtas ") == cmd) {
 				cli_del_tls_alternate_server(cs,cmd+5);
+				type_cli_cursor(cs);
+			} else if(strstr(cmd,"ss") == cmd) {
+				print_stun_stats(cs);
 				type_cli_cursor(cs);
 			} else {
 				const char* str="Unknown command\n";
