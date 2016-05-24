@@ -35,7 +35,11 @@
 #include "ns_turn_msg_addr.h"
 #include "ns_turn_ioalib.h"
 
+stun_stats_t stun_stats;
+
 ///////////////////////////////////////////
+
+
 
 #define FUNCSTART if(server && eve(server->verbose)) TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO,"%s:%d:start\n",__FUNCTION__,__LINE__)
 #define FUNCEND if(server && eve(server->verbose)) TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO,"%s:%d:end\n",__FUNCTION__,__LINE__)
@@ -53,6 +57,35 @@ static inline int get_family(int stun_family) {
 	default:
 		return AF_INET;
 	};
+}
+
+void init_stun_stats() {
+	pthread_mutex_init(&stun_stats.mutex, NULL);
+}
+
+void inc_stun_stats(int stun_method, int error) {
+	stun_method --;
+
+	if (stun_method < 0 && stun_method >= STUN_METHOD_MAX) {
+		return;
+	}
+
+	pthread_mutex_lock(&stun_stats.mutex);
+	if (!error) {
+		stun_stats.method_cnt[stun_method] ++;
+	} else {
+		stun_stats.method_error_cnt[stun_method] ++;
+	}
+	pthread_mutex_unlock(&stun_stats.mutex);
+}
+
+stun_stats_t get_stun_stats(void) {
+	stun_stats_t stats;
+
+	pthread_mutex_lock(&stun_stats.mutex);
+	stats = stun_stats;
+	pthread_mutex_unlock(&stun_stats.mutex);
+	return stats;
 }
 
 ////////////////////////////////////////////////
@@ -3602,6 +3635,7 @@ static int handle_turn_command(turn_turnserver *server, ts_ur_super_session *ss,
 						if(!origin_found) {
 							err_code = 441;
 							reason = (const u08bits *)"The origin attribute does not match the initial session origin value";
+							STUN_STATS_INC(method, err_code);
 							if(server->verbose) {
 								char smethod[129];
 								stun_method_str(method,smethod);
@@ -3611,6 +3645,7 @@ static int handle_turn_command(turn_turnserver *server, ts_ur_super_session *ss,
 					} else if(norigins > 0){
 						err_code = 441;
 						reason = (const u08bits *)"The origin attribute is empty, does not match the initial session origin value";
+						STUN_STATS_INC(method, err_code);
 						if(server->verbose) {
 							char smethod[129];
 							stun_method_str(method,smethod);
@@ -3677,6 +3712,7 @@ static int handle_turn_command(turn_turnserver *server, ts_ur_super_session *ss,
 				handle_turn_allocate(server, ss, &tid, resp_constructed, &err_code, &reason,
 							unknown_attrs, &ua_num, in_buffer, nbh);
 
+				STUN_STATS_INC(method, err_code);
 				if(server->verbose) {
 				  log_method(ss, "ALLOCATE", err_code, reason);
 				}
@@ -3689,6 +3725,7 @@ static int handle_turn_command(turn_turnserver *server, ts_ur_super_session *ss,
 				handle_turn_connect(server, ss, &tid, &err_code, &reason,
 							unknown_attrs, &ua_num, in_buffer);
 
+				STUN_STATS_INC(method, err_code);
 				if(server->verbose) {
 				  log_method(ss, "CONNECT", err_code, reason);
 				}
@@ -3703,6 +3740,7 @@ static int handle_turn_command(turn_turnserver *server, ts_ur_super_session *ss,
 				handle_turn_connection_bind(server, ss, &tid, resp_constructed, &err_code, &reason,
 								unknown_attrs, &ua_num, in_buffer, nbh, message_integrity, can_resume);
 
+				STUN_STATS_INC(method, err_code);
 				if(server->verbose && err_code) {
 				  log_method(ss, "CONNECTION_BIND", err_code, reason);
 				}
@@ -3715,6 +3753,7 @@ static int handle_turn_command(turn_turnserver *server, ts_ur_super_session *ss,
 								unknown_attrs, &ua_num, in_buffer, nbh, message_integrity,
 								&no_response, can_resume);
 
+				STUN_STATS_INC(method, err_code);
 				if(server->verbose) {
 				  log_method(ss, "REFRESH", err_code, reason);
 				}
@@ -3725,6 +3764,7 @@ static int handle_turn_command(turn_turnserver *server, ts_ur_super_session *ss,
 				handle_turn_channel_bind(server, ss, &tid, resp_constructed, &err_code, &reason,
 								unknown_attrs, &ua_num, in_buffer, nbh);
 
+				STUN_STATS_INC(method, err_code);
 				if(server->verbose) {
 				  log_method(ss, "CHANNEL_BIND", err_code, reason);
 				}
@@ -3735,6 +3775,7 @@ static int handle_turn_command(turn_turnserver *server, ts_ur_super_session *ss,
 				handle_turn_create_permission(server, ss, &tid, resp_constructed, &err_code, &reason,
 								unknown_attrs, &ua_num, in_buffer, nbh);
 
+				STUN_STATS_INC(method, err_code);
 				if(server->verbose) {
 				  log_method(ss, "CREATE_PERMISSION", err_code, reason);
 				}
@@ -3754,6 +3795,7 @@ static int handle_turn_command(turn_turnserver *server, ts_ur_super_session *ss,
 							&dest_changed, &response_destination,
 							0, 0);
 
+				STUN_STATS_INC(method, err_code);
 				if(server->verbose) {
 				  log_method(ss, "BINDING", err_code, reason);
 				}
@@ -3802,6 +3844,7 @@ static int handle_turn_command(turn_turnserver *server, ts_ur_super_session *ss,
 
 				handle_turn_send(server, ss, &err_code, &reason, unknown_attrs, &ua_num, in_buffer);
 
+				STUN_STATS_INC(method, err_code);
 				if(eve(server->verbose)) {
 				  log_method(ss, "SEND", err_code, reason);
 				}
@@ -3812,6 +3855,7 @@ static int handle_turn_command(turn_turnserver *server, ts_ur_super_session *ss,
 
 				err_code = 403;
 
+				STUN_STATS_INC(method, err_code);
 				if(eve(server->verbose)) {
 				  log_method(ss, "DATA", err_code, reason);
 				}
@@ -3880,6 +3924,7 @@ static int handle_turn_command(turn_turnserver *server, ts_ur_super_session *ss,
 		}
 
 		if(err_code) {
+			STUN_STATS_INC(method, err_code);
 			if(server->verbose) {
 			  log_method(ss, "message", err_code, reason);
 			}

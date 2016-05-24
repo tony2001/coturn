@@ -81,6 +81,7 @@
 #define STUN_METHOD_CONNECTION_BIND (0x000b)
 #define STUN_METHOD_CONNECTION_ATTEMPT (0x000c)
 /* <<== RFC 6062 */
+#define STUN_METHOD_MAX (0x000c) /* must be always equal to the last method */
 
 #define STUN_ATTRIBUTE_MAPPED_ADDRESS (0x0001)
 #define OLD_STUN_ATTRIBUTE_RESPONSE_ADDRESS (0x0002)

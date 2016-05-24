@@ -31,6 +31,8 @@
 #ifndef __TURN_SERVER__
 #define __TURN_SERVER__
 
+#include <pthread.h>
+
 #include "ns_turn_utils.h"
 #include "ns_turn_session.h"
 
@@ -167,7 +169,22 @@ struct _turn_turnserver {
 	const char* oauth_server_name;
 };
 
+
+typedef struct _stun_stats {
+	unsigned long method_cnt[STUN_METHOD_MAX];
+	unsigned long method_error_cnt[STUN_METHOD_MAX];
+	pthread_mutex_t mutex;
+} stun_stats_t;
+
+extern stun_stats_t stun_stats;
+
+#define STUN_STATS_INC(method, err_code) inc_stun_stats(method, err_code ? 1 : 0)
+
 ///////////////////////////////////////////
+
+void init_stun_stats(void);
+void inc_stun_stats(int stun_method, int error);
+stun_stats_t get_stun_stats(void);
 
 void init_turn_server(turn_turnserver* server,
 					turnserver_id id, int verbose,
