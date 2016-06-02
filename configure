@@ -218,10 +218,11 @@ pthread_testlib() {
     if [ ${ER} -eq 0 ] ; then
     	return 1
     else
-    	${CC} ${TH_TMPCPROGC} -o ${TH_TMPCPROGB} ${OSCFLAGS} ${OSLIBS} -D_GNU_SOURCE 2>>/dev/null
+        ${CC} ${TH_TMPCPROGC} -o ${TH_TMPCPROGB} ${OSCFLAGS} ${OSLIBS} -lpthread -D_GNU_SOURCE 2>>/dev/null
     	ER=$?
     	if [ ${ER} -eq 0 ] ; then
 	    	${ECHO_CMD} "Older GNU pthread library found"
+	        OSLIBS="${OSLIBS} -lpthread"
 	    	OSCFLAGS="${OSCFLAGS} -D_GNU_SOURCE"
 	    	return 1
 	    else
